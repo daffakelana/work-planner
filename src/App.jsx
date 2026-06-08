@@ -7,8 +7,10 @@ import HomeView from "./views/HomeView";
 import ProgressView from "./views/ProgressView";
 import PlansView from "./views/PlansView";
 import ProfileView from "./views/ProfileView";
+import ManageView from "./views/ManageView";
 
 import { WEEKS } from "./data/weeks";
+import { weekMeta } from "./utils/dates";
 import { C, FONT_BODY } from "./theme";
 
 const TITLES = {
@@ -16,6 +18,7 @@ const TITLES = {
   progress: "Statistik Lari",
   plans: "Program",
   profile: "Profil",
+  manage: "Kelola Latihan",
 };
 
 export default function App() {
@@ -34,7 +37,21 @@ export default function App() {
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  const week = WEEKS[weekIndex];
+  // Overlay real calendar dates onto the plan so "Today" tracks the device date.
+  const week = useMemo(() => {
+    const base = WEEKS[weekIndex];
+    const meta = weekMeta(weekIndex);
+    return {
+      ...base,
+      range: meta.range,
+      days: base.days.map((d, i) => ({
+        ...d,
+        date: meta.days[i].date,
+        month: meta.days[i].month,
+        today: meta.days[i].isToday,
+      })),
+    };
+  }, [weekIndex]);
 
   const summary = useMemo(() => {
     const totalKm = week.days.reduce((s, d) => s + d.km, 0);
@@ -125,11 +142,13 @@ export default function App() {
           {tab === "progress" && <ProgressView week={week} isDone={isDone} />}
           {tab === "plans" && <PlansView />}
           {tab === "profile" && <ProfileView totalKm={summary.totalKm} />}
+          {tab === "manage" && <ManageView />}
         </div>
 
         {/* floating add button on home */}
         {tab === "home" && (
           <button
+            onClick={() => setTab("manage")}
             className="flex items-center justify-center"
             style={{
               position: "absolute",

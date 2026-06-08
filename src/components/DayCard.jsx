@@ -30,7 +30,7 @@ export default function DayCard({ d, index, open, onToggle, done, onDone }) {
             {d.day}
           </div>
           <div style={{ fontSize: 11, color: C.faint, marginTop: 5, letterSpacing: ".06em" }}>
-            {d.date} MAR
+            {d.date} {d.month || "MAR"}
           </div>
           {d.today && (
             <div
