@@ -6,7 +6,7 @@ import { C, FONT_DISPLAY } from "../theme";
 
 // An expandable card representing one day of the plan, with a "mark done" action.
 export default function DayCard({ d, index, open, onToggle, done, onDone }) {
-  const t = TYPES[d.type];
+  const t = TYPES[d.kind] || TYPES.easy;
 
   return (
     <div
@@ -77,7 +77,7 @@ export default function DayCard({ d, index, open, onToggle, done, onDone }) {
               cursor: "pointer",
             }}
           >
-            <TypeIcon type={d.type} />
+            <TypeIcon type={d.kind} />
             <div className="flex-1" style={{ minWidth: 0 }}>
               <div className="flex items-center" style={{ gap: 7 }}>
                 <span style={{ fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 15.5, color: C.ink }}>

@@ -1,15 +1,16 @@
+import { NavLink } from "react-router-dom";
 import { Home, BarChart3, Compass, User } from "lucide-react";
 import { C } from "../theme";
 
 const TABS = [
-  { id: "home",     icon: Home },
-  { id: "progress", icon: BarChart3 },
-  { id: "plans",    icon: Compass },
-  { id: "profile",  icon: User },
+  { to: "/",         icon: Home },
+  { to: "/progress", icon: BarChart3 },
+  { to: "/plans",    icon: Compass },
+  { to: "/profile",  icon: User },
 ];
 
-// Fixed bottom tab bar.
-export default function BottomNav({ tab, setTab }) {
+// Fixed bottom tab bar driven by the router.
+export default function BottomNav() {
   return (
     <div
       className="flex-none flex items-center justify-around"
@@ -21,19 +22,19 @@ export default function BottomNav({ tab, setTab }) {
         borderTop: `1px solid ${C.hair}`,
       }}
     >
-      {TABS.map(({ id, icon: Icon }) => {
-        const active = tab === id;
-        return (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            className="flex items-center justify-center"
-            style={{ background: "transparent", border: "none", cursor: "pointer", padding: 12 }}
-          >
-            <Icon size={23} strokeWidth={active ? 2.6 : 2} color={active ? C.ink : C.faint} />
-          </button>
-        );
-      })}
+      {TABS.map(({ to, icon: Icon }) => (
+        <NavLink
+          key={to}
+          to={to}
+          end
+          className="flex items-center justify-center"
+          style={{ textDecoration: "none", padding: 12 }}
+        >
+          {({ isActive }) => (
+            <Icon size={23} strokeWidth={isActive ? 2.6 : 2} color={isActive ? C.ink : C.faint} />
+          )}
+        </NavLink>
+      ))}
     </div>
   );
 }

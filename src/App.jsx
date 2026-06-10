@@ -1,34 +1,46 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense } from "react";
+import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { Plus, Wifi, BatteryFull, SignalHigh } from "lucide-react";
 
 import Header from "./components/Header";
 import BottomNav from "./components/BottomNav";
 import HomeView from "./views/HomeView";
-import ProgressView from "./views/ProgressView";
-import PlansView from "./views/PlansView";
-import ProfileView from "./views/ProfileView";
-import ManageView from "./views/ManageView";
 
-import { WEEKS } from "./data/weeks";
+import { useWorkouts, groupByWeek, weekLabel, DAY_ORDER } from "./store/workouts";
+import { kindOf, summaryOf, kmOf } from "./data/types";
+import { useAuth } from "./auth/AuthProvider";
+import AuthView from "./views/AuthView";
 import { weekMeta } from "./utils/dates";
 import { C, FONT_BODY } from "./theme";
 
-const TITLES = {
-  home: "Menu Mingguan",
-  progress: "Statistik Lari",
-  plans: "Program",
-  profile: "Profil",
-  manage: "Kelola Latihan",
+// Lazy-loaded routes — each chunk loads only when its page is opened,
+// keeping the initial bundle small (ManageView pulls in the heavy xlsx lib).
+const ProgressView = lazy(() => import("./views/ProgressView"));
+const PlansView = lazy(() => import("./views/PlansView"));
+const ProfileView = lazy(() => import("./views/ProfileView"));
+const ManageView = lazy(() => import("./views/ManageView"));
+const TemplatesView = lazy(() => import("./views/TemplatesView"));
+
+const TITLE_BY_PATH = {
+  "/": "Menu Mingguan",
+  "/progress": "Statistik Lari",
+  "/plans": "Program",
+  "/profile": "Profil",
+  "/manage": "Kelola Latihan",
+  "/templates": "Blok Latihan",
 };
 
 export default function App() {
-  const [wide, setWide] = useState(false);
-  const [tab, setTab] = useState("home");
-  const [weekIndex, setWeekIndex] = useState(0);
-  const [open, setOpen] = useState(() => new Set(["0-2"])); // today's strength open
-  const [done, setDone] = useState(() => new Set(["0-0", "0-1"]));
+  const { session, loading: authLoading } = useAuth();
+  const { items } = useWorkouts();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
 
-  // Switch to a device-frame layout on wide screens.
+  const [wide, setWide] = useState(false);
+  const [weekIndex, setWeekIndex] = useState(0);
+  const [open, setOpen] = useState(() => new Set());
+  const [done, setDone] = useState(() => new Set());
+
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 640px)");
     const update = () => setWide(mq.matches);
@@ -37,52 +49,74 @@ export default function App() {
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  // Overlay real calendar dates onto the plan so "Today" tracks the device date.
-  const week = useMemo(() => {
-    const base = WEEKS[weekIndex];
-    const meta = weekMeta(weekIndex);
-    return {
-      ...base,
-      range: meta.range,
-      days: base.days.map((d, i) => ({
-        ...d,
-        date: meta.days[i].date,
-        month: meta.days[i].month,
-        today: meta.days[i].isToday,
-      })),
-    };
-  }, [weekIndex]);
+  const weeks = useMemo(() => groupByWeek(items), [items]);
+  const weeksCount = Math.max(1, weeks.length);
+  const safeIndex = Math.min(weekIndex, weeksCount - 1);
+  const meta = useMemo(() => weekMeta(safeIndex), [safeIndex]);
+
+  const days = useMemo(() => {
+    const list = weeks[safeIndex] || [];
+    return list.map((it) => {
+      const wd = DAY_ORDER[it.day] ?? 0;
+      const md = meta.days[wd];
+      return { ...it, kind: kindOf(it), summary: summaryOf(it), date: md.date, month: md.month, today: md.isToday };
+    });
+  }, [weeks, safeIndex, meta]);
+
+  const weekInfo = { label: weekLabel(safeIndex), range: meta.range };
 
   const summary = useMemo(() => {
-    const totalKm = week.days.reduce((s, d) => s + d.km, 0);
-    const sessions = week.days.filter((d) => d.type !== "rest").length;
-    const doneCount = week.days.filter((_, i) => done.has(`${weekIndex}-${i}`)).length;
+    const totalKm = days.reduce((s, d) => s + kmOf(d), 0);
+    const sessions = days.filter((d) => d.category !== "rest").length;
+    const doneCount = days.filter((d) => done.has(d.id)).length;
     return { totalKm, sessions, doneCount };
-  }, [week, done, weekIndex]);
+  }, [days, done]);
 
-  const isOpen = (i) => open.has(`${weekIndex}-${i}`);
-  const isDone = (i) => done.has(`${weekIndex}-${i}`);
-
-  const toggle = (setter) => (i) => {
-    const k = `${weekIndex}-${i}`;
+  const isOpen = (id) => open.has(id);
+  const isDone = (id) => done.has(id);
+  const toggle = (setter) => (id) =>
     setter((prev) => {
       const n = new Set(prev);
-      n.has(k) ? n.delete(k) : n.add(k);
+      n.has(id) ? n.delete(id) : n.add(id);
       return n;
     });
-  };
   const toggleOpen = toggle(setOpen);
   const toggleDone = toggle(setDone);
+
+  const title = TITLE_BY_PATH[pathname] || "Menu Mingguan";
+  const isHome = pathname === "/";
+
+  if (authLoading)
+    return (
+      <div className="flex items-center justify-center" style={{ minHeight: "100dvh", background: C.bg, color: C.sub, fontFamily: FONT_BODY }}>
+        Memuat…
+      </div>
+    );
+  if (!session) return <AuthView />;
 
   const appStyle = wide
     ? {
         width: 442,
         height: "min(880px, 94vh)",
         borderRadius: 38,
-        boxShadow:
-          "0 50px 90px -40px rgba(20,20,40,0.45), 0 0 0 1px rgba(20,20,40,0.05)",
+        boxShadow: "0 50px 90px -40px rgba(20,20,40,0.45), 0 0 0 1px rgba(20,20,40,0.05)",
       }
-    : { width: "100%", minHeight: "100vh", borderRadius: 0 };
+    : { width: "100%", height: "100dvh", borderRadius: 0 };
+
+  const home = (
+    <HomeView
+      days={days}
+      weekInfo={weekInfo}
+      weekIndex={safeIndex}
+      weeksCount={weeksCount}
+      setWeekIndex={setWeekIndex}
+      summary={summary}
+      isOpen={isOpen}
+      isDone={isDone}
+      onToggleOpen={toggleOpen}
+      onToggleDone={toggleDone}
+    />
+  );
 
   return (
     <div
@@ -102,16 +136,10 @@ export default function App() {
         className="flex flex-col"
         style={{ ...appStyle, background: C.bg, overflow: "hidden", position: "relative" }}
       >
-        {/* status bar (device frame only) */}
         {wide && (
           <div
             className="flex-none flex items-center justify-between"
-            style={{
-              padding: "14px 26px 2px",
-              fontFamily: "'Bricolage Grotesque', sans-serif",
-              fontWeight: 700,
-              fontSize: 14,
-            }}
+            style={{ padding: "14px 26px 2px", fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 700, fontSize: 14 }}
           >
             <span>9:41</span>
             <div className="flex items-center" style={{ gap: 6 }}>
@@ -122,33 +150,24 @@ export default function App() {
           </div>
         )}
 
-        {/* scroll area */}
         <div className="flex-1" style={{ overflowY: "auto" }}>
-          <Header title={TITLES[tab]} />
-
-          {tab === "home" && (
-            <HomeView
-              week={week}
-              weekIndex={weekIndex}
-              weeksCount={WEEKS.length}
-              setWeekIndex={setWeekIndex}
-              summary={summary}
-              isOpen={isOpen}
-              isDone={isDone}
-              onToggleOpen={toggleOpen}
-              onToggleDone={toggleDone}
-            />
-          )}
-          {tab === "progress" && <ProgressView week={week} isDone={isDone} />}
-          {tab === "plans" && <PlansView />}
-          {tab === "profile" && <ProfileView totalKm={summary.totalKm} />}
-          {tab === "manage" && <ManageView />}
+          <Header title={title} />
+          <Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: C.sub, fontSize: 13 }}>Memuat…</div>}>
+            <Routes>
+              <Route path="/" element={home} />
+              <Route path="/progress" element={<ProgressView week={{ ...weekInfo, days }} isDone={isDone} />} />
+              <Route path="/plans" element={<PlansView />} />
+              <Route path="/profile" element={<ProfileView totalKm={summary.totalKm} />} />
+              <Route path="/manage" element={<ManageView />} />
+              <Route path="/templates" element={<TemplatesView />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
         </div>
 
-        {/* floating add button on home */}
-        {tab === "home" && (
+        {isHome && (
           <button
-            onClick={() => setTab("manage")}
+            onClick={() => navigate("/manage")}
             className="flex items-center justify-center"
             style={{
               position: "absolute",
@@ -167,7 +186,7 @@ export default function App() {
           </button>
         )}
 
-        <BottomNav tab={tab} setTab={setTab} />
+        <BottomNav />
       </div>
     </div>
   );

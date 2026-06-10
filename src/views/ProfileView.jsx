@@ -1,4 +1,5 @@
-import { MapPin, Award } from "lucide-react";
+import { MapPin, Award, LogOut } from "lucide-react";
+import { useAuth } from "../auth/AuthProvider";
 import StatChip from "../components/StatChip";
 import { TYPES } from "../data/types";
 import { C, FONT_DISPLAY } from "../theme";
@@ -7,6 +8,7 @@ const AVATAR = "https://i.pravatar.cc/120?img=12";
 
 // Profile tab: runner identity, stats and monthly goal.
 export default function ProfileView({ totalKm }) {
+  const { user, signOut } = useAuth();
   return (
     <div style={{ padding: "4px 18px 24px", animation: "rp-rise .45s ease both" }}>
       <div className="flex flex-col items-center" style={{ paddingTop: 8, marginBottom: 22 }}>
@@ -44,6 +46,13 @@ export default function ProfileView({ totalKm }) {
           <div style={{ height: "100%", width: "75%", background: C.accent, borderRadius: 999 }} />
         </div>
       </div>
+
+      <button onClick={signOut} className="flex items-center justify-center"
+        style={{ gap: 8, width: "100%", height: 46, borderRadius: 14, marginTop: 16,
+          background: C.card, border: `1px solid ${C.hair}`, color: C.ink,
+          fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+        <LogOut size={17} /> Keluar{user?.email ? ` (${user.email})` : ""}
+      </button>
     </div>
   );
 }

@@ -4,11 +4,11 @@ import { C, FONT_DISPLAY } from "../theme";
 
 // Progress tab: daily distance bar chart, key stats and completion bar.
 export default function ProgressView({ week, isDone }) {
-  const maxKm = Math.max(...week.days.map((d) => d.km), 1);
-  const totalKm = week.days.reduce((s, d) => s + d.km, 0);
-  const sessions = week.days.filter((d) => d.type !== "rest").length;
-  const doneCount = week.days.filter((_, i) => isDone(i)).length;
-  const longest = Math.max(...week.days.map((d) => d.km));
+  const maxKm = Math.max(...week.days.map((d) => d.distanceKm || 0), 1);
+  const totalKm = week.days.reduce((s, d) => s + (d.distanceKm || 0), 0);
+  const sessions = week.days.filter((d) => d.category !== "rest").length;
+  const doneCount = week.days.filter((d) => isDone(d.id)).length;
+  const longest = Math.max(...week.days.map((d) => d.distanceKm || 0));
   const pct = Math.round((doneCount / sessions) * 100) || 0;
 
   return (
@@ -36,17 +36,17 @@ export default function ProgressView({ week, isDone }) {
         </div>
         <div className="flex items-end" style={{ gap: 8, height: 130 }}>
           {week.days.map((d, i) => {
-            const h = d.km === 0 ? 4 : Math.round((d.km / maxKm) * 110);
-            const t = TYPES[d.type];
+            const h = (d.distanceKm || 0) === 0 ? 4 : Math.round(((d.distanceKm || 0) / maxKm) * 110);
+            const t = TYPES[d.kind] || TYPES.easy;
             return (
               <div key={i} className="flex-1 flex flex-col items-center" style={{ gap: 7 }}>
-                <span style={{ fontSize: 10, color: C.faint, height: 12 }}>{d.km || ""}</span>
+                <span style={{ fontSize: 10, color: C.faint, height: 12 }}>{d.distanceKm || ""}</span>
                 <div
                   style={{
                     width: "100%",
                     height: h,
                     borderRadius: 7,
-                    background: d.km === 0 ? C.hair : t.fg,
+                    background: (d.distanceKm || 0) === 0 ? C.hair : t.fg,
                     transition: "height .5s cubic-bezier(.2,.8,.2,1)",
                   }}
                 />
